@@ -121,7 +121,7 @@ cnn = CNN()
 
 #Define loss and optimizer
 criterion = nn.BCELoss()
-optimizer = optim.Adam(cnn.parameters(), lr=0.001)
+optimizer = optim.Adam(cnn.parameters(), lr=0.01)
 
 epochs = 5 
 
