@@ -66,6 +66,12 @@ for epoch in range(epochs):
         loss.backward()
         optimizer.step()
 
+#torch.save(cnn, 'misc/models/imagecnn.pth') #Save the model
+
+model_scripted = torch.jit.script(cnn) # Export to TorchScript
+model_scripted.save('misc/models/imagecnn.pt') # Save
+
+"""
 correct = 0
 total = 0
 
@@ -79,6 +85,5 @@ with torch.no_grad():
         correct += (predicted == labels).sum().item()
 
 print(f'Accuracy: {100 * correct // total} %')
-
-
+"""
 
