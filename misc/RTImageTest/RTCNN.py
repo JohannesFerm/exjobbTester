@@ -5,7 +5,7 @@ import torch
 from torchvision import transforms
 import time
 
-#https://www.youtube.com/watch?v=CmDO-w56qso, good tutorial for working with a intel realsense camera in python
+#https://www.youtube.com/watch?v=CmDO-w56qso, good tutorial for working with an intel realsense camera in python
 
 #Basic stuff to set up a pipeline for the intel camera
 pipe = rs.pipeline()
