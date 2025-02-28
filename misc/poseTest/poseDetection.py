@@ -40,7 +40,7 @@ profile = pipe.start()
 mpPose = mp.solutions.pose
 mp_drawing = mp.solutions.drawing_utils
 
-#Capture frames from the camera and save in correct folder, do 100 at a time
+#Video stream
 with mpPose.Pose(min_detection_confidence = 0.5, min_tracking_confidence = 0.5, static_image_mode=False) as pose:
     while True:
         frames = pipe.wait_for_frames()
