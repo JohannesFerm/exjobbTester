@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Labeling</title>
+    <script>
+        function sendLabel(label) {
+            fetch(`/label/${label}`)
+                .then(response => response.text()) 
+                .then(data => console.log(data))
+                .catch(error => console.error("Error:", error));
+        }
+    </script>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            gap: 20px;
+            background-color: #f0f0f0;
+        }
+        button {
+            font-size: 24px;
+            padding: 20px 40px;
+            border: none;
+            background-color: #007bff;
+            color: white;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+        button:active {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <button onclick="sendLabel('A')">A</button>
+    <button onclick="sendLabel('B')">B</button>
+    <button onclick="sendLabel('C')">C</button>
+</body>
+</html>
