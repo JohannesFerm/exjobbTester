@@ -11,10 +11,16 @@ import torchvision.models as models
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+import timm 
+from sklearn.metrics import confusion_matrix, classification_report
+import matplotlib.pyplot as plt
+import seaborn as sns
 
-seed = 42
+seed = 10
 random.seed(seed)
 torch.manual_seed(seed)
+torch.cuda.manual_seed(seed)
+torch.cuda.manual_seed_all(seed)
 
 #Create a custom dataset
 class AudioDataset(Dataset):
@@ -54,7 +60,7 @@ class AudioDataset(Dataset):
         data, sr = torchaudio.load(fileName)
 
         #Way to handle the last clip from the split being less than 10 seconds
-        expectedDur = sr * 10 
+        expectedDur = sr * 5 
         if data.shape[1] < expectedDur:
             return None  
 
@@ -78,6 +84,12 @@ class TransformedSubset(Dataset):
         tdata = self.transform(data)
         return tdata, label
 
+def normalizeSpectrogram(spectrogram):
+    mean = spectrogram.mean()
+    std = spectrogram.std()
+    return (spectrogram - mean) / (std + 1e-6)
+
+
 #Function to randomly transform the samples, data augmentation
 def randomTransform(wave):
 
@@ -85,9 +97,10 @@ def randomTransform(wave):
     wave = T.Vol(gain=random.uniform(0, 10))(wave) 
 
     #Convert to spectrogram and apply two more
-    spectrogram = MelSpectrogram(n_mels=40)(wave)
+    spectrogram = MelSpectrogram(n_mels=80)(wave)
     spectrogram = T.TimeMasking(time_mask_param=random.randint(10, 100))(spectrogram) 
     spectrogram = T.FrequencyMasking(freq_mask_param=random.randint(5, 30))(spectrogram) 
+    spectrogram = normalizeSpectrogram(spectrogram)
 
     return spectrogram.squeeze(0) 
         
@@ -105,25 +118,27 @@ trainIndices, testIndices = train_test_split(
 
 #Get the two sets of data, with different transforms
 trainDataset = TransformedSubset(dataset, trainIndices, randomTransform)
-testDataset = TransformedSubset(dataset, testIndices, lambda data: MelSpectrogram(n_mels=40)(data).squeeze(0))
+testDataset = TransformedSubset(dataset, testIndices, lambda data: normalizeSpectrogram(MelSpectrogram(n_mels=80)(data).squeeze(0)))
 
 #Define dataloaders
 trainDataloader = DataLoader(trainDataset, batch_size=8, shuffle=True, num_workers=0)
 testDataloader = DataLoader(testDataset, batch_size=8, shuffle=True, num_workers=0)
 
-# Load MobileNetV3 (pretrained) and modify it
-model = models.mobilenet_v3_small(weights=models.MobileNet_V3_Small_Weights.DEFAULT)
-model.features[0][0] = nn.Conv2d(1, 16, kernel_size=3, stride=1, padding=1, bias=False)
+#Load model
 num_classes = len(set(dataset.labels))  
-model.classifier[-1] = nn.Linear(model.classifier[-1].in_features, num_classes)
+model = timm.create_model("efficientnet_b3", pretrained=True, in_chans=1, num_classes=num_classes)
+
+#Put on the GPU
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model.to(device)
 
 #Define loss and optimizer
 criterion = nn.CrossEntropyLoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-4, weight_decay=1e-4)
+optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, weight_decay=1e-4)
 
-scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3, verbose=True)
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3)
 
-epochs = 20
+epochs = 20 
 
 #Train the model
 model.train()
@@ -132,6 +147,7 @@ for epoch in range(epochs):
     correct, total = 0, 0
 
     for inputs, labels in trainDataloader:
+        inputs, labels = inputs.to(device), labels.to(device)
         inputs = inputs.unsqueeze(1)
 
         optimizer.zero_grad()
@@ -151,25 +167,39 @@ for epoch in range(epochs):
 
     print(f"Epoch {epoch+1}/{epochs}, Loss: {running_loss/len(trainDataloader):.4f}, Accuracy: {100 * correct / total:.2f}%")
 
+#Test the model
 model.eval()
 total_loss, correct, total = 0, 0, 0
+all_preds = []
+all_labels = []
 
-for inputs, labels in testDataloader:
-    print(f"Input shape: {inputs.shape}, Labels: {labels}")  # Debug output
-    break  # Just check the first batch
-
-
-#Test the model
 with torch.no_grad():
     for inputs, labels in testDataloader:
+        inputs, labels = inputs.to(device), labels.to(device)
         inputs = inputs.unsqueeze(1)  
         outputs = model(inputs)
         loss = criterion(outputs, labels)
 
         total_loss += loss.item()
         _, predicted = outputs.max(1)
+
         total += labels.size(0)
         correct += predicted.eq(labels).sum().item()
 
+        all_preds.extend(predicted.cpu().numpy())
+        all_labels.extend(labels.cpu().numpy())
 
-print(f"Test Loss: {total_loss/len(testDataloader):.4f}, Accuracy: {100 * correct / total:.2f}%")
+test_loss = total_loss / len(testDataloader)
+test_acc = 100 * correct / total
+print(f"Test Loss: {test_loss:.4f}, Accuracy: {test_acc:.2f}%")
+
+#Confusion matrix
+cm = confusion_matrix(all_labels, all_preds)
+plt.figure(figsize=(10, 8))
+sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", xticklabels=dataset.labelMap.keys(), yticklabels=dataset.labelMap.keys())
+plt.xlabel("Predicted Label")
+plt.ylabel("True Label")
+plt.title("Confusion Matrix")
+plt.show()
+
+print(classification_report(all_labels, all_preds, target_names=dataset.labelMap.keys()))

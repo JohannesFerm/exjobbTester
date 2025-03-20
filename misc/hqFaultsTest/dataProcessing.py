@@ -14,7 +14,7 @@ os.makedirs(outputDir, exist_ok=True)
 
 inputAudio, sampleRate = librosa.load(inputFile, sr=None)
 
-length = 10
+length = 5
 size = int(length * sampleRate)
 
 #Loop through the audio file in size segments
