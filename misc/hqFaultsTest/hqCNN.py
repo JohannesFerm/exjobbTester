@@ -121,12 +121,15 @@ trainDataset = TransformedSubset(dataset, trainIndices, randomTransform)
 testDataset = TransformedSubset(dataset, testIndices, lambda data: normalizeSpectrogram(MelSpectrogram(n_mels=80)(data).squeeze(0)))
 
 #Define dataloaders
-trainDataloader = DataLoader(trainDataset, batch_size=8, shuffle=True, num_workers=0)
-testDataloader = DataLoader(testDataset, batch_size=8, shuffle=True, num_workers=0)
+trainDataloader = DataLoader(trainDataset, batch_size=32, shuffle=True, num_workers=4)
+testDataloader = DataLoader(testDataset, batch_size=32, shuffle=True, num_workers=4)
 
 #Load model
 num_classes = len(set(dataset.labels))  
-model = timm.create_model("efficientnet_b3", pretrained=True, in_chans=1, num_classes=num_classes)
+#model = timm.create_model("efficientnet_lite0", pretrained=True, in_chans=1, num_classes=num_classes) #Works, good accuracy
+#model = timm.create_model("mobilenetv3_large_100", pretrained=True, in_chans=1, num_classes=num_classes) #Decent accuracy
+#model = timm.create_model("mobilenetv3_small_100", pretrained=True, in_chans=1, num_classes=num_classes) #Poor accuracy
+model = timm.create_model("ghostnet_100", pretrained=True, in_chans=1, num_classes=num_classes) #Good accuracy
 
 #Put on the GPU
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
