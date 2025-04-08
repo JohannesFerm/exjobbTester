@@ -2,6 +2,7 @@ import librosa
 import numpy as np
 import os
 import pandas as pd
+import pickle
 
 dir = "misc/mowerDataset/"
 clipDuration = 2
@@ -39,21 +40,17 @@ for label in labels:
         
         if len(imu) < 2:
             #Handle missing IMU data, assume linearity and simply get a new value by averaging
-            if len(imu) == 1:                
-                newData = np.array([np.mean(j) for j in zip(imu[0], imuChunks[i + 1][0])])
-                imu = np.append(imu, [newData], axis=0)
-            elif len(imu) == 0: #Fix
-                print("HEJ")
+            if len(imu) == 1:
+                if i < len(audioClips) - 1:                
+                    newData = np.array([np.mean(j) for j in zip(imu[0], imuChunks[i + 1][0])])
+                    imu = np.append(imu, [newData], axis=0)
+                else:
+                    newData = np.array([np.mean(j) for j in zip(imu[0], imuChunks[i - 1][0])])
+                    imu = np.append(imu, [newData], axis=0)
+            elif len(imu) == 0: #Skip samples where IMU data is empty
+                continue
         datasetArray.append([audio, imu, label])
     
-
-#Write dataset to csv file
-dataset = pd.DataFrame(data=datasetArray, columns=["audio", "imu", "label"])
-dataset.to_csv('out.csv', index=False)
-
-"""
-TODO:
-Fixa len(imu) == 0
-Fixa ändarna, om len(imu) == 1 i slutet går ej i + 1
-Kolla efter så att alla imu arrays har dim 2
-"""
+#Write dataset to file
+dataFrame = pd.DataFrame(datasetArray, columns=["audio", "imu", "label"])
+dataFrame.to_pickle('misc/mowerModel/mowerData.pkl')
