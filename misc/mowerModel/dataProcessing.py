@@ -35,7 +35,8 @@ for label in labels:
     
     #Create dataset
     for i in range(len(audioClips)):
-        audio = audioClips[i]
+        audio = librosa.feature.melspectrogram(y=audioClips[i], sr=sr, n_fft=2048, hop_length=512, n_mels=128)
+        audio = librosa.power_to_db(audio, ref=np.max)
         imu = imuChunks[i]
         
         if len(imu) < 2:
