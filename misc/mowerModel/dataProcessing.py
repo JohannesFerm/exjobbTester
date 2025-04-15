@@ -28,12 +28,13 @@ for label in labels:
         elif file.endswith(".csv"):
             df = pd.read_csv(dir + label + "/" + file)
             t0 = df["timestamp"][0]
-            df["timestamp"] = df["timestamp"].apply(lambda x: (x - t0))
+            df["timestamp"] = df["timestamp"].apply(lambda x: (x - t0)) #Offset the time so it begins at 0
 
             #Chunk IMU data to match the audio length
             imuChunks = [df.loc[(df["timestamp"] >= i * clipDuration) & (df["timestamp"] < (i + 1) * clipDuration), ["roll", "pitch", "yaw"]].values for i in range(len(audioClips))]
-    
+
     #Create dataset
+    seqLength = 5
     for i in range(len(audioClips)):
         audio = librosa.feature.melspectrogram(y=audioClips[i], sr=sr, n_fft=2048, hop_length=512, n_mels=128)
         audio = librosa.power_to_db(audio, ref=np.max)
@@ -50,8 +51,16 @@ for label in labels:
                     imu = np.append(imu, [newData], axis=0)
             elif len(imu) == 0: #Skip samples where IMU data is empty
                 continue
+            
         datasetArray.append([audio, imu, label])
     
 #Write dataset to file
 dataFrame = pd.DataFrame(datasetArray, columns=["audio", "imu", "label"])
 dataFrame.to_pickle('misc/mowerModel/mowerData.pkl')
+
+"""
+TODO:
+Lägg till i slutet att göra IMU-sekvenser på 5 (10 s)
+Kolla om det går att köra denna + modell i ett gemensamt skript som också laddar upp modellen på rpin
+Ändra paths, kolla i data_collection skriptet
+"""

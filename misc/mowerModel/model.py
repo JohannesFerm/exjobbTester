@@ -46,7 +46,7 @@ data["chunkId"] = data.index // chunkSize
 
 uniqueChunks = data["chunkId"].unique()
 
-# Split the chunk IDs into train/test sets
+#Split the chunk IDs into train/test sets
 trainChunks, testChunks = train_test_split(uniqueChunks, test_size=0.2, random_state=seed)
 
 # Create the actual train/test DataFrames by filtering on chunkId
@@ -160,10 +160,14 @@ numEpochs = 10
 for epoch in range(numEpochs):
     trainLoss, trainAcc = train(model, trainLoader, optimizer, criterion, device)
 
+    '''
     testLoss, testAcc, testReport = test(model, testLoader, criterion, device)
     
     print(f"Epoch {epoch+1}/{numEpochs}")
     print(f"Train Loss: {trainLoss:.4f}, Train Accuracy: {trainAcc:.2f}%")
     print(f"Test Loss: {testLoss:.4f}, Test Accuracy: {testAcc:.2f}%")
     print(f"Classification Report: \n{testReport}")
-    
+    '''
+modelScript = torch.jit.script(model)
+modelScript.save('misc/models/multimodalNet.pt')
+
