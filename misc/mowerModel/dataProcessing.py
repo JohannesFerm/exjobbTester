@@ -34,7 +34,6 @@ for label in labels:
             imuChunks = [df.loc[(df["timestamp"] >= i * clipDuration) & (df["timestamp"] < (i + 1) * clipDuration), ["roll", "pitch", "yaw"]].values for i in range(len(audioClips))]
 
     #Create dataset
-    seqLength = 5
     for i in range(len(audioClips)):
         audio = librosa.feature.melspectrogram(y=audioClips[i], sr=sr, n_fft=2048, hop_length=512, n_mels=128)
         audio = librosa.power_to_db(audio, ref=np.max)
@@ -53,14 +52,28 @@ for label in labels:
                 continue
             
         datasetArray.append([audio, imu, label])
-    
+
+#Loop through dataset and create longer IMU sequences
+seqLength = 5
+imuArray = [row[1] for row in datasetArray]
+for i in range(len(datasetArray)):
+    newEntry = np.empty(seqLength, dtype=object)
+    newEntry[0] = datasetArray[i][1]
+    for j in range(1, seqLength):
+        if i - j < 0: #Zero-pad in the beginning
+            newEntry[j] = np.array(([[0] * 3, [0] * 3]))
+        else:
+            newEntry[j] = imuArray[i - j]
+
+    newEntry = np.stack(newEntry)
+    datasetArray[i][1] = newEntry[::-1].reshape(10,3)
+
 #Write dataset to file
 dataFrame = pd.DataFrame(datasetArray, columns=["audio", "imu", "label"])
 dataFrame.to_pickle('misc/mowerModel/mowerData.pkl')
 
 """
 TODO:
-Lägg till i slutet att göra IMU-sekvenser på 5 (10 s)
 Kolla om det går att köra denna + modell i ett gemensamt skript som också laddar upp modellen på rpin
-Ändra paths, kolla i data_collection skriptet
+Ändra paths, kolla i mower_node skriptet
 """

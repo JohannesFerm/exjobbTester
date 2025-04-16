@@ -12,6 +12,8 @@ import pickle
 import pandas as pd
 from torch.utils.data import random_split
 from sklearn.model_selection import train_test_split
+import numpy as np
+import seaborn as sns
 
 
 
@@ -160,14 +162,15 @@ numEpochs = 10
 for epoch in range(numEpochs):
     trainLoss, trainAcc = train(model, trainLoader, optimizer, criterion, device)
 
-    '''
     testLoss, testAcc, testReport = test(model, testLoader, criterion, device)
     
     print(f"Epoch {epoch+1}/{numEpochs}")
     print(f"Train Loss: {trainLoss:.4f}, Train Accuracy: {trainAcc:.2f}%")
     print(f"Test Loss: {testLoss:.4f}, Test Accuracy: {testAcc:.2f}%")
     print(f"Classification Report: \n{testReport}")
-    '''
+
+
+'''
 modelScript = torch.jit.script(model)
 modelScript.save('misc/models/multimodalNet.pt')
-
+'''
