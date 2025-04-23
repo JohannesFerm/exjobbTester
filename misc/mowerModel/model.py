@@ -170,6 +170,7 @@ for epoch in range(numEpochs):
     print(f"Classification Report: \n{testReport}")
 
 
+torch.save(model.state_dict(), "misc/models/model_weights.pth")
 '''
 modelScript = torch.jit.script(model)
 modelScript.save('misc/models/multimodalNet.pt')
