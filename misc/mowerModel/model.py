@@ -24,7 +24,7 @@ torch.cuda.manual_seed(seed)
 torch.cuda.manual_seed_all(seed)
 
 #Load data from file
-with open("misc/mowerModel/mowerData.pkl", "rb") as file:
+with open("misc/mowerModel/mowerData2seconds.pkl", "rb") as file:
     data = pickle.load(file)
 
 #Custom dataset for multimodal data
@@ -70,15 +70,18 @@ class MultimodalModel(nn.Module):
         #Define cnn, remove classification layer
         self.cnn = timm.create_model("efficientnet_lite0", pretrained=True, in_chans=1) 
         self.cnn.fc = nn.Identity() 
+        self.cnnDropout = nn.Dropout(p=0.3)
+        
 
         #Define lstm
-        self.lstm = nn.LSTM(input_size=3, hidden_size=512, num_layers=2, batch_first=True)
+        self.lstm = nn.LSTM(input_size=3, hidden_size=512, num_layers=2, batch_first=True, dropout = 0.3)
 
         #Fully connected layer
         self.fc = nn.Linear(1512, numClasses)
     
     def forward(self, audio, imu):
         cnnOut = self.cnn(audio)
+        cnnOut = self.cnnDropout(cnnOut)
 
         imuOut, (hn, cn) = self.lstm(imu)
         imuOut = hn[-1]
@@ -95,7 +98,7 @@ model = MultimodalModel(numClasses).to(device)
 
 #Loss function and optimizer
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters(), lr=1e-4)
+optimizer = optim.Adam(model.parameters(), lr=1e-4, weight_decay=1e-3)
 
 #Training
 def train(model, trainLoader, optimizer, criterion, device):
@@ -170,7 +173,7 @@ for epoch in range(numEpochs):
     print(f"Classification Report: \n{testReport}")
 
 
-torch.save(model.state_dict(), "misc/models/model_weights.pth")
+#torch.save(model.state_dict(), "misc/models/model_weights.pth")
 '''
 modelScript = torch.jit.script(model)
 modelScript.save('misc/models/multimodalNet.pt')

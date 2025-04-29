@@ -4,34 +4,25 @@ import os
 import pandas as pd
 import pickle
 
-dir = "misc/mowerDataset/"
-clipDuration = 1
 
-labels = os.listdir(dir)
-
-datasetArray = []
-
-for label in labels:
+def rawDataToDataframe(audioPath, imuPath, label, clipDuration = 1, seqLength = 5):
+    datasetArray = []
     audioClips = []
     imuChunks = []
     
-    #Loop through files, make sure audio file is processed first
-    for file in sorted(os.listdir(dir + label), key=lambda x: 0 if ".wav" in x else 1):
+    #Load and split audio
+    audio, sr = librosa.load(audioPath, sr=None)
+    numClips = len(audio) // (clipDuration * sr)
+    audioClips = [audio[i*clipDuration*sr : (i+1)*clipDuration*sr] for i in range(numClips)]
         
-        #Process audio
-        if file.endswith(".wav"):
-            audio, sr = librosa.load(dir + label + "/" + file, sr=None)
-            numClips = len(audio) // (clipDuration * sr)
-            audioClips = [audio[i*clipDuration*sr : (i+1)*clipDuration*sr] for i in range(numClips)]
-        
-        #Process IMU 
-        elif file.endswith(".csv"):
-            df = pd.read_csv(dir + label + "/" + file)
-            t0 = df["timestamp"][0]
-            df["timestamp"] = df["timestamp"].apply(lambda x: (x - t0)) #Offset the time so it begins at 0
+    #Process IMU 
+    print(imuPath)
+    df = pd.read_csv(imuPath)
+    t0 = df["timestamp"][0]
+    df["timestamp"] = df["timestamp"].apply(lambda x: (x - t0)) #Offset the time so it begins at 0
 
-            #Chunk IMU data to match the audio length
-            imuChunks = [df.loc[(df["timestamp"] >= i * clipDuration) & (df["timestamp"] < (i + 1) * clipDuration), ["roll", "pitch", "yaw"]].values for i in range(len(audioClips))]
+    #Chunk IMU data to match the audio length
+    imuChunks = [df.loc[(df["timestamp"] >= i * clipDuration) & (df["timestamp"] < (i + 1) * clipDuration), ["roll", "pitch", "yaw"]].values for i in range(len(audioClips))]
 
     #Create dataset
     for i in range(len(audioClips)):
@@ -62,27 +53,56 @@ for label in labels:
             
         datasetArray.append([audio, imu, label])
 
-#Loop through dataset and create longer IMU sequences
-seqLength = 5
-imuArray = [row[1] for row in datasetArray]
-for i in range(len(datasetArray)):
-    newEntry = np.empty(seqLength, dtype=object)
-    newEntry[0] = datasetArray[i][1]
-    for j in range(1, seqLength):
-        if i - j < 0: #Zero-pad in the beginning
-            newEntry[j] = np.zeros((clipDuration, 3))
-        else:
-            newEntry[j] = imuArray[i - j]
+    #Loop through dataset and create longer IMU sequences
+    seqLength = 5
+    imuArray = [row[1] for row in datasetArray]
+    for i in range(len(datasetArray)):
+        newEntry = np.empty(seqLength, dtype=object)
+        newEntry[0] = datasetArray[i][1]
+        for j in range(1, seqLength):
+            if i - j < 0: #Zero-pad in the beginning
+                newEntry[j] = np.zeros((clipDuration, 3))
+            else:
+                newEntry[j] = imuArray[i - j]
 
-    newEntry = np.stack(newEntry)
-    finalShape = (seqLength * clipDuration, 3)
-    datasetArray[i][1] = newEntry[::-1].reshape(finalShape)
+        newEntry = np.stack(newEntry)
+        finalShape = (seqLength * clipDuration, 3)
+        datasetArray[i][1] = newEntry[::-1].reshape(finalShape)
 
+    #Return dataframe for current file pair
+    dataFrame = pd.DataFrame(datasetArray, columns=["audio", "imu", "label"])
+    return dataFrame
 
-#Write dataset to file
-dataFrame = pd.DataFrame(datasetArray, columns=["audio", "imu", "label"])
-dataFrame.to_pickle('misc/mowerModel/mowerData1seconds.pkl')
+if __name__ == "__main__":
+    
+    dataframes = []
+    datasetDir = "misc/mowerDataset"
+    labels = os.listdir(datasetDir)
 
+    for label in labels:
+        labelPath = os.path.join(datasetDir, label)
+        sampleFolders = os.listdir(labelPath)
+
+        for sample in sampleFolders:
+            samplePath = os.path.join(labelPath, sample)
+            
+            files = os.listdir(samplePath)
+            audioFile = next((f for f in files if f.endswith('.wav')), None)
+            imuFile = next((f for f in files if 'imu' in f.lower()), None)
+
+            if audioFile and imuFile:
+                audioPath = os.path.join(samplePath, audioFile)
+                imuPath = os.path.join(samplePath, imuFile)
+            
+                dataframes.append(rawDataToDataframe(audioPath, imuPath, label))
+
+    dataset = pd.concat(dataframes, ignore_index=True)
+    print(dataset.head())
+    print(dataset.shape)
+    print(dataset.columns)
+    print(dataset.iloc[100])
+    print(dataset.sample(1))
+    print(dataset['label'].value_counts())
 """
 TODO:
 Kolla om det går att köra denna + modell i ett gemensamt skript som också laddar upp modellen på rpin
