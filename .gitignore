@@ -6,4 +6,7 @@ misc/webserverDataset/
 misc/husqvarnaData/
 misc/husqvarnaDataSplit/
 misc/mowerDataset/
+misc/mowerModel/mowerData1seconds.pkl
+misc/mowerModel/mowerData2seconds.pkl
+misc/mowerModel/mowerData5seconds.pkl
 misc/mowerModel/mowerData.pkl
