@@ -5,7 +5,7 @@ import pandas as pd
 import pickle
 
 dir = "misc/mowerDataset/"
-clipDuration = 2
+clipDuration = 1
 
 labels = os.listdir(dir)
 
@@ -39,16 +39,25 @@ for label in labels:
         audio = librosa.power_to_db(audio, ref=np.max)
         imu = imuChunks[i]
         
-        if len(imu) < 2:
+        if len(imu) < clipDuration:
+            if clipDuration == 1:  #Special handling when clipDuration is 1
+                if i < len(audioClips) - 1 and i > 0:                
+                  newData = np.mean([imuChunks[i - 1][0], imuChunks[i + 1][0]], axis=0)
+                elif i == 0: #If first value is missing
+                    newData = imuChunks[i + 1][0] #Use next point
+                else: #If last value is missing
+                    newData = imuChunks[i - 1][0]
+                imu = np.append(imu, [newData], axis=0)
+
             #Handle missing IMU data, assume linearity and simply get a new value by averaging
-            if len(imu) == 1:
+            elif len(imu) == clipDuration - 1:
                 if i < len(audioClips) - 1:                
-                    newData = np.array([np.mean(j) for j in zip(imu[0], imuChunks[i + 1][0])])
+                    newData = np.array([np.mean(j) for j in zip(imu[clipDuration - 2], imuChunks[i + 1][0])])
                     imu = np.append(imu, [newData], axis=0)
                 else:
-                    newData = np.array([np.mean(j) for j in zip(imu[0], imuChunks[i - 1][0])])
+                    newData = np.array([np.mean(j) for j in zip(imu[clipDuration - 2], imuChunks[i - 1][0])])
                     imu = np.append(imu, [newData], axis=0)
-            elif len(imu) == 0: #Skip samples where IMU data is empty
+            else: #Skip samples where IMU data is too empty
                 continue
             
         datasetArray.append([audio, imu, label])
@@ -61,16 +70,18 @@ for i in range(len(datasetArray)):
     newEntry[0] = datasetArray[i][1]
     for j in range(1, seqLength):
         if i - j < 0: #Zero-pad in the beginning
-            newEntry[j] = np.array(([[0] * 3, [0] * 3]))
+            newEntry[j] = np.zeros((clipDuration, 3))
         else:
             newEntry[j] = imuArray[i - j]
 
     newEntry = np.stack(newEntry)
-    datasetArray[i][1] = newEntry[::-1].reshape(10,3)
+    finalShape = (seqLength * clipDuration, 3)
+    datasetArray[i][1] = newEntry[::-1].reshape(finalShape)
+
 
 #Write dataset to file
 dataFrame = pd.DataFrame(datasetArray, columns=["audio", "imu", "label"])
-dataFrame.to_pickle('misc/mowerModel/mowerData.pkl')
+dataFrame.to_pickle('misc/mowerModel/mowerData1seconds.pkl')
 
 """
 TODO:
