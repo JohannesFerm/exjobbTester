@@ -16,7 +16,6 @@ def rawDataToDataframe(audioPath, imuPath, label, clipDuration = 1, seqLength = 
     audioClips = [audio[i*clipDuration*sr : (i+1)*clipDuration*sr] for i in range(numClips)]
         
     #Process IMU 
-    print(imuPath)
     df = pd.read_csv(imuPath)
     t0 = df["timestamp"][0]
     df["timestamp"] = df["timestamp"].apply(lambda x: (x - t0)) #Offset the time so it begins at 0
@@ -95,14 +94,13 @@ if __name__ == "__main__":
                 imuPath = os.path.join(samplePath, imuFile)
             
                 dataframes.append(rawDataToDataframe(audioPath, imuPath, label))
+            
+            print(samplePath)
+            print(label)
 
     dataset = pd.concat(dataframes, ignore_index=True)
-    print(dataset.head())
-    print(dataset.shape)
-    print(dataset.columns)
-    print(dataset.iloc[100])
-    print(dataset.sample(1))
-    print(dataset['label'].value_counts())
+    dataset.to_pickle('misc/mowerModel/mowerDataBig.pkl')
+
 """
 TODO:
 Kolla om det går att köra denna + modell i ett gemensamt skript som också laddar upp modellen på rpin

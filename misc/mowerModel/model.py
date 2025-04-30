@@ -24,7 +24,7 @@ torch.cuda.manual_seed(seed)
 torch.cuda.manual_seed_all(seed)
 
 #Load data from file
-with open("misc/mowerModel/mowerData2seconds.pkl", "rb") as file:
+with open("misc/mowerModel/mowerDataBig.pkl", "rb") as file:
     data = pickle.load(file)
 
 #Custom dataset for multimodal data
