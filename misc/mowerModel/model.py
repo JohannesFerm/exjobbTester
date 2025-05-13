@@ -15,16 +15,18 @@ from sklearn.model_selection import train_test_split
 import numpy as np
 import seaborn as sns
 
-
-
-seed = 10
+seed = 42
 random.seed(seed)
 torch.manual_seed(seed)
 torch.cuda.manual_seed(seed)
 torch.cuda.manual_seed_all(seed)
+np.random.seed(seed)
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
+
 
 #Load data from file
-with open("misc/mowerModel/mowerDataBig.pkl", "rb") as file:
+with open("misc/mowerModel/mowerDataFin2seconds.pkl", "rb") as file:
     data = pickle.load(file)
 
 #Custom dataset for multimodal data
@@ -59,8 +61,8 @@ trainDataset = MultimodalDataset(trainData)
 testDataset = MultimodalDataset(testData)
 
 #Create DataLoader
-trainLoader = DataLoader(trainDataset, batch_size=32, shuffle=True)
-testLoader = DataLoader(testDataset, batch_size=32)
+trainLoader = DataLoader(trainDataset, batch_size=32, shuffle=True, num_workers=0)
+testLoader = DataLoader(testDataset, batch_size=32, num_workers=0)
 
 #Class for multimodal model
 class MultimodalModel(nn.Module):
@@ -70,18 +72,17 @@ class MultimodalModel(nn.Module):
         #Define cnn, remove classification layer
         self.cnn = timm.create_model("efficientnet_lite0", pretrained=True, in_chans=1) 
         self.cnn.fc = nn.Identity() 
-        self.cnnDropout = nn.Dropout(p=0.3)
-        
+        #self.cnnDropout = nn.Dropout(p=0.7)
 
         #Define lstm
-        self.lstm = nn.LSTM(input_size=3, hidden_size=512, num_layers=2, batch_first=True, dropout = 0.3)
+        self.lstm = nn.LSTM(input_size=3, hidden_size=512, num_layers=2, batch_first=True)#, dropout = 0.7)
 
         #Fully connected layer
         self.fc = nn.Linear(1512, numClasses)
     
     def forward(self, audio, imu):
         cnnOut = self.cnn(audio)
-        cnnOut = self.cnnDropout(cnnOut)
+        #cnnOut = self.cnnDropout(cnnOut)
 
         imuOut, (hn, cn) = self.lstm(imu)
         imuOut = hn[-1]
@@ -98,7 +99,11 @@ model = MultimodalModel(numClasses).to(device)
 
 #Loss function and optimizer
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters(), lr=1e-4, weight_decay=1e-3)
+optimizer = optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-5)
+
+print("Label to index mapping:")
+for idx, label in enumerate(trainDataset.uniqueLabels):
+    print(f"{idx}: {label}")
 
 #Training
 def train(model, trainLoader, optimizer, criterion, device):
@@ -173,7 +178,11 @@ for epoch in range(numEpochs):
     print(f"Classification Report: \n{testReport}")
 
 
-#torch.save(model.state_dict(), "misc/models/model_weights.pth")
+torch.save({
+    'model_state_dict': model.state_dict(),
+    'label_mapping': trainDataset.uniqueLabels.tolist()
+}, 'misc/models/model_with_labels.pth')
+
 '''
 modelScript = torch.jit.script(model)
 modelScript.save('misc/models/multimodalNet.pt')

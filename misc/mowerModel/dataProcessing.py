@@ -5,7 +5,7 @@ import pandas as pd
 import pickle
 
 
-def rawDataToDataframe(audioPath, imuPath, label, clipDuration = 1, seqLength = 5):
+def rawDataToDataframe(audioPath, imuPath, label, clipDuration = 5, seqLength = 5):
     datasetArray = []
     audioClips = []
     imuChunks = []
@@ -99,10 +99,4 @@ if __name__ == "__main__":
             print(label)
 
     dataset = pd.concat(dataframes, ignore_index=True)
-    dataset.to_pickle('misc/mowerModel/mowerDataBig.pkl')
-
-"""
-TODO:
-Kolla om det går att köra denna + modell i ett gemensamt skript som också laddar upp modellen på rpin
-Ändra paths, kolla i mower_node skriptet
-"""
+    dataset.to_pickle('misc/mowerModel/mowerDataFin5seconds.pkl')

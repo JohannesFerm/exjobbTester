@@ -15,12 +15,26 @@ import timm
 from sklearn.metrics import confusion_matrix, classification_report
 import matplotlib.pyplot as plt
 import seaborn as sns
+import numpy as np
 
-seed = 10
+seed = 42
 random.seed(seed)
 torch.manual_seed(seed)
 torch.cuda.manual_seed(seed)
 torch.cuda.manual_seed_all(seed)
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
+np.random.seed(seed)
+
+g = torch.Generator()
+g.manual_seed(seed)
+
+def seedWorker(workerID): #For determinism
+    workerSeed = seed + workerID
+    np.random.seed(workerSeed)
+    random.seed(workerSeed)
+    torch.manual_seed(workerSeed)
+
 
 #Create a custom dataset
 class AudioDataset(Dataset):
@@ -60,7 +74,7 @@ class AudioDataset(Dataset):
         data, sr = torchaudio.load(fileName)
 
         #Way to handle the last clip from the split being less than 10 seconds
-        expectedDur = sr * 5 
+        expectedDur = sr * 5
         if data.shape[1] < expectedDur:
             return None  
 
@@ -105,7 +119,7 @@ def randomTransform(wave):
     return spectrogram.squeeze(0) 
         
 #Load the full dataset
-dataset = AudioDataset("misc/husqvarnaDataSplit/")
+dataset = AudioDataset("misc/husqvarnaDataSplit5s/")
 
 #Split dataset by index
 labels = torch.tensor(dataset.labels)
@@ -121,15 +135,15 @@ trainDataset = TransformedSubset(dataset, trainIndices, randomTransform)
 testDataset = TransformedSubset(dataset, testIndices, lambda data: normalizeSpectrogram(MelSpectrogram(n_mels=80)(data).squeeze(0)))
 
 #Define dataloaders
-trainDataloader = DataLoader(trainDataset, batch_size=32, shuffle=True, num_workers=4)
-testDataloader = DataLoader(testDataset, batch_size=32, shuffle=True, num_workers=4)
+trainDataloader = DataLoader(trainDataset, batch_size=16, shuffle=True, num_workers=4, worker_init_fn=seedWorker, generator=g)
+testDataloader = DataLoader(testDataset, batch_size=16, shuffle=True, num_workers=4, worker_init_fn=seedWorker, generator=g)
 
 #Load model
 num_classes = len(set(dataset.labels))  
-#model = timm.create_model("efficientnet_lite0", pretrained=True, in_chans=1, num_classes=num_classes) #Works, good accuracy
+model = timm.create_model("efficientnet_lite0", pretrained=True, in_chans=1, num_classes=num_classes) #Works, good accuracy
 #model = timm.create_model("mobilenetv3_large_100", pretrained=True, in_chans=1, num_classes=num_classes) #Decent accuracy
 #model = timm.create_model("mobilenetv3_small_100", pretrained=True, in_chans=1, num_classes=num_classes) #Poor accuracy
-model = timm.create_model("ghostnet_100", pretrained=True, in_chans=1, num_classes=num_classes) #Good accuracy
+#model = timm.create_model("ghostnet_100", pretrained=True, in_chans=1, num_classes=num_classes) #Good accuracy
 
 #Put on the GPU
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -137,9 +151,7 @@ model.to(device)
 
 #Define loss and optimizer
 criterion = nn.CrossEntropyLoss()
-optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, weight_decay=1e-4)
-
-scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3)
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-4, weight_decay=1e-4)
 
 epochs = 20 
 
@@ -164,9 +176,6 @@ for epoch in range(epochs):
         _, predicted = outputs.max(1)
         total += labels.size(0)
         correct += predicted.eq(labels).sum().item()
-
-    scheduler.step(running_loss / len(trainDataloader))
-
 
     print(f"Epoch {epoch+1}/{epochs}, Loss: {running_loss/len(trainDataloader):.4f}, Accuracy: {100 * correct / total:.2f}%")
 

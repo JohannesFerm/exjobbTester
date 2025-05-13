@@ -9,12 +9,12 @@ label = "stuckBlade"
 inputFile = f"misc/husqvarnaData/{label}.wav"
 
 #Output to correct label folder
-outputDir = f"misc/husqvarnaDataSplit/{label}/"
+outputDir = f"misc/husqvarnaDataSplit10s/{label}/"
 os.makedirs(outputDir, exist_ok=True) 
 
 inputAudio, sampleRate = librosa.load(inputFile, sr=None)
 
-length = 5
+length = 10
 size = int(length * sampleRate)
 
 #Loop through the audio file in size segments
